@@ -10,30 +10,52 @@ import Data.ByteString.Lazy
 import qualified Data.Text as T
 import Network.Wreq
 
-type Tenant = Int
+data Endpoints = Endpoints
+  { config :: String
+  , someOther :: String
+  }
 
-type Domain = Int
+data UserContext = UserContext
+  { tenantId :: Int
+  , domainId :: Int
+  , posId :: Int
+  }
 
-type Pos = Int
-
-type Env = (Tenant, Domain, Pos)
-
-url = "https://m.travelrepublic.co.uk/api2/webconfig/public/getallbyscope"
+data Env = Env
+  { userContext :: UserContext
+  , endpoints :: Endpoints
+  }
 
 opts :: ReaderT Env IO Options
 opts = do
-  (t, d, p) <- ask
+  (d, p) <- extract <$> ask
   let domain = param "domainId" .~ [parse d]
       pos = param "posId" .~ [parse p]
       labels = param "labels" .~ ["GraphQL"]
   pure $ defaults & (domain . pos . labels)
   where
     parse = T.pack . show
+    extract Env {userContext = UserContext {domainId = d, posId = p}} = (d, p)
 
 fetchConfig :: ReaderT Env IO ByteString
 fetchConfig = do
+  url <- extractUrl <$> ask
   o <- opts
   resp <- liftIO $ getWith o url
   pure $ resp ^. responseBody
+  where
+    extractUrl Env {endpoints = Endpoints {config = url}} = url
 
-getConfig = runReaderT fetchConfig (1, 1, 1)
+getConfig = runReaderT fetchConfig defaultEnv
+
+--use lenses to get stuff out of this structure
+defaultEnv =
+  Env
+    { userContext = UserContext 1 1 1
+    , endpoints =
+        Endpoints
+          { config =
+              "https://m.travelrepublic.co.uk/api2/webconfig/public/getallbyscope"
+          , someOther = ""
+          }
+    }
