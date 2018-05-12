@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Api where
 
@@ -11,20 +12,26 @@ import qualified Data.Text as T
 import Network.Wreq
 
 data Endpoints = Endpoints
-  { config :: String
-  , someOther :: String
-  }
+  { _config :: String
+  , _someOther :: String
+  } deriving (Show)
 
 data UserContext = UserContext
-  { tenantId :: Int
-  , domainId :: Int
-  , posId :: Int
-  }
+  { _tenantId :: Int
+  , _domainId :: Int
+  , _posId :: Int
+  } deriving (Show)
 
 data Env = Env
-  { userContext :: UserContext
-  , endpoints :: Endpoints
-  }
+  { _userContext :: UserContext
+  , _endpoints :: Endpoints
+  } deriving (Show)
+
+makeLenses ''Env
+
+makeLenses ''UserContext
+
+makeLenses ''Endpoints
 
 opts :: ReaderT Env IO Options
 opts = do
@@ -35,27 +42,26 @@ opts = do
   pure $ defaults & (domain . pos . labels)
   where
     parse = T.pack . show
-    extract Env {userContext = UserContext {domainId = d, posId = p}} = (d, p)
+    extract e = (e ^. userContext . domainId, e ^. userContext . posId)
 
 fetchConfig :: ReaderT Env IO ByteString
 fetchConfig = do
-  url <- extractUrl <$> ask
+  url <- configUrl <$> ask
   o <- opts
   resp <- liftIO $ getWith o url
   pure $ resp ^. responseBody
   where
-    extractUrl Env {endpoints = Endpoints {config = url}} = url
+    configUrl e = e ^. endpoints . config
 
 getConfig = runReaderT fetchConfig defaultEnv
 
---use lenses to get stuff out of this structure
 defaultEnv =
   Env
-    { userContext = UserContext 1 1 1
-    , endpoints =
+    { _userContext = UserContext 1 1 1
+    , _endpoints =
         Endpoints
-          { config =
+          { _config =
               "https://m.travelrepublic.co.uk/api2/webconfig/public/getallbyscope"
-          , someOther = ""
+          , _someOther = ""
           }
     }
