@@ -6,10 +6,14 @@ module Api where
 import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
-import Data.Aeson.Lens (_String, key)
-import Data.ByteString.Lazy
+import Data.Aeson (Value)
+
+--import Data.Aeson.Lens (_String, key)
+import Data.Map as Map
 import qualified Data.Text as T
 import Network.Wreq
+
+type Resp = Response (Map String Value)
 
 data Endpoints = Endpoints
   { _config :: String
@@ -33,7 +37,9 @@ makeLenses ''UserContext
 
 makeLenses ''Endpoints
 
-opts :: ReaderT Env IO Options
+type App a = ReaderT Env IO a
+
+opts :: App Options
 opts = do
   (d, p) <- extract <$> ask
   let domain = param "domainId" .~ [parse d]
@@ -44,11 +50,11 @@ opts = do
     parse = T.pack . show
     extract e = (e ^. userContext . domainId, e ^. userContext . posId)
 
-fetchConfig :: ReaderT Env IO ByteString
+fetchConfig :: App (Map String Value)
 fetchConfig = do
   url <- configUrl <$> ask
   o <- opts
-  resp <- liftIO $ getWith o url
+  resp <- liftIO $ asJSON =<< getWith o url
   pure $ resp ^. responseBody
   where
     configUrl e = e ^. endpoints . config
