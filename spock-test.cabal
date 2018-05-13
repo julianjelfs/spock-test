@@ -22,6 +22,7 @@ executable spock-test
                      , mtl
                      , text
                      , http-types
+                     , http-client
                      , lucid
                      , Spock-lucid
                      , aeson
