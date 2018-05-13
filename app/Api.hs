@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Api where
 
@@ -11,6 +12,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import Data.Aeson.Types ((.:))
 import qualified Data.ByteString.Lazy as BS
+import Data.Foldable (asum)
 import Data.Map as Map
 import qualified Data.Text as T
 import qualified Network.Wreq as W
@@ -77,18 +79,54 @@ defaultEnv =
           }
     }
 
+testJson = BS.readFile "./app/test.json"
+
 --data structure for actually holding the config
 data Config = Config
   { publishedVersion :: Integer
   , version :: Integer
+  , settings :: [ConfigSetting]
   } deriving (Show)
+
+data ConfigSetting = ConfigSetting
+  { name :: String
+  , value :: ConfigValue
+  } deriving (Show)
+
+data ConfigValue
+  = StringConfigValue String
+  | IntConfigValue Int
+  | BoolConfigValue Bool
+  deriving (Show)
 
 instance A.FromJSON Config where
   parseJSON = configParser
+
+instance A.FromJSON ConfigSetting where
+  parseJSON = configSettingParser
+
+instance A.FromJSON ConfigValue where
+  parseJSON = configValueParser
 
 configParser :: A.Value -> A.Parser Config
 configParser =
   A.withObject "config" $ \obj -> do
     version <- obj .: "Version"
     publishedVersion <- obj .: "PublishedVersion"
-    pure Config {publishedVersion = publishedVersion, version = version}
+    settings <- obj .: "Settings"
+    pure Config {..}
+
+configSettingParser :: A.Value -> A.Parser ConfigSetting
+configSettingParser =
+  A.withObject "config setting" $ \obj -> do
+    name <- obj .: "Name"
+    value <- obj .: "Value"
+    pure ConfigSetting {..}
+
+configValueParser :: A.Value -> A.Parser ConfigValue
+configValueParser v =
+  asum
+    [ StringConfigValue <$> A.parseJSON v
+    , IntConfigValue <$> A.parseJSON v
+    , BoolConfigValue <$> A.parseJSON v
+    ]
