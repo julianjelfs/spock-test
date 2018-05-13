@@ -1,3 +1,4 @@
 { 
-  "hotelService": "https://some.url.or.other"
+  "hotelService": "https://some.url.or.other",
+  "configService": "https://m.travelrepublic.co.uk/api2/webconfig/public/getallbyscope"
 }
