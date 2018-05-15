@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
@@ -7,6 +8,7 @@ import Web.Spock.Config
 import Web.Spock.Lucid (lucid)
 
 import Api (fetchWebConfig)
+import Control.Concurrent
 import Control.Monad.Trans
 import Control.Monad.Trans.Reader
 import Data.IORef
@@ -31,6 +33,35 @@ loadConfig = do
 
 getWebConfig :: IO (Maybe WebConfig)
 getWebConfig = runReaderT fetchWebConfig defaultEnv
+
+data Config = Config
+  { x :: Int
+  , y :: Int
+  } deriving (Show)
+
+config :: IO (MVar Config)
+config = newMVar (Config 0 0)
+
+increment :: Config -> Config
+increment Config {..} = Config (x + 1) (y + 1)
+
+poll :: IO ()
+poll = do
+  mv <- newIORef (Config 0 0)
+  threadId <- forkIO (checkStuff mv)
+  pure ()
+
+checkStuff :: IORef Config -> IO ()
+checkStuff mv = do
+  putStrLn "polling..."
+  threadDelay 1000000
+  cfg@Config {..} <- readIORef mv
+  if x < 10
+    then do
+      print (show cfg)
+      modifyIORef mv increment
+      checkStuff mv
+    else print "We have finished"
 
 main :: IO ()
 main = do
